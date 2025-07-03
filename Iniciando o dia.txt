@@ -1,0 +1,16 @@
+Iniciando o dia:
+
+Abra o terminal na pasta do projeto.
+
+Rode: docker compose up -d
+
+Acesse http://localhost:8080.
+
+Finalizando o dia:
+
+Abra o terminal na pasta do projeto.
+
+Rode: docker compose down
+
+Instalar bibliotecas necessárias:
+docker compose exec --user airflow airflow-webserver python -m pip install requests beautifulsoup4

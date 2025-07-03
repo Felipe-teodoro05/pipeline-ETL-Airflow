@@ -1,0 +1,80 @@
+# A linha 'version' foi removida por ser obsoleta.
+services:
+  postgres:
+    image: postgres:13
+    container_name: postgres_db_noticias
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Tarefa única de inicialização do Airflow.
+  # Ela roda, prepara o banco e cria o usuário, depois para.
+  airflow-init:
+    build: .
+    container_name: airflow_init_noticias
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      # Variáveis de inicialização (_AIRFLOW_...) removidas para evitar conflito com o 'command'.
+    command: >
+      bash -c "
+        set -e;
+        airflow db upgrade;
+        echo 'Criando ou atualizando usuário: admin';
+        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || airflow users set-password --username admin --password admin;
+      "
+
+  airflow-webserver:
+    build: .
+    container_name: airflow_webserver_noticias
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully # Espera o 'init' terminar com sucesso.
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__WEBSERVER__SECRET_KEY=docker1234 # Troque por qualquer outra string
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./scripts:/opt/airflow/scripts
+    ports:
+      - "8080:8080"
+    command: webserver
+
+  airflow-scheduler:
+    build: .
+    container_name: airflow_scheduler_noticias
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully # Espera o 'init' terminar com sucesso.
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__WEBSERVER__SECRET_KEY=docker1234 # Troque por qualquer outra string
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./scripts:/opt/airflow/scripts
+    command: scheduler
+
+volumes:
+  postgres_data:
