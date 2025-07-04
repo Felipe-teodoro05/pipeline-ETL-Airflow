@@ -13,10 +13,10 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 def extract_g1_data():
     """
-    Extrai TODAS as notícias da página de tecnologia do G1 usando Selenium
+    Extrai todas as notícias da página de tecnologia do G1 usando Selenium
     para carregar o conteúdo dinâmico.
     """
-    print("Iniciando a extração de dados do G1 (método Selenium)...")
+    print("Iniciando a extração de dados do G1...")
 
     # --- Configuração do Selenium ---
     chrome_options = Options()
