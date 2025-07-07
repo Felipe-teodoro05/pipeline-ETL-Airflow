@@ -68,7 +68,7 @@ def extract_the_verge():
         print(f"Dados salvos em {caminho_arquivo}")
         print(f"Total de notícias extraídas do The Verge: {len(noticias_extraidas)}")
     else:
-        print("Nenhuma notícia foi efetivamente extraída do G1.")
+        print("Nenhuma notícia foi efetivamente extraída do The Verge.")
 
 if __name__ == "__main__":
     extract_the_verge()
