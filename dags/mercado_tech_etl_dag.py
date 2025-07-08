@@ -1,9 +1,9 @@
-from __future__ import annotations
+from __future__ import annotations # Apenas como garantia de compatibilidade futura
 
-import pendulum
+import pendulum # Para data e hora, muito mais intuitivo que datetime
 from airflow.models import DAG
-from airflow.operators.bash import BashOperator
-from airflow.operators.empty import EmptyOperator
+from airflow.operators.bash import BashOperator # Para executar scripts Python
+from airflow.operators.empty import EmptyOperator # Para marcar início e fim do DAG
 
 # Definindo fuso horário
 local_tz = pendulum.timezone("America/Sao_Paulo")
