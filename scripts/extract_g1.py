@@ -1,99 +1,74 @@
-import time
+import requests
+from bs4 import BeautifulSoup
 import json
 import os
+import time
 from datetime import datetime
-from bs4 import BeautifulSoup
+import argparse
 
-# Importações do Selenium
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-
-def extract_g1_data():
+def extract_g1_data(num_pages: int):
     """
-    Extrai as notícias da página de tecnologia do G1 usando Selenium
-    para carregar o conteúdo dinâmico.
+    Extrai notícias de tecnologia do G1 usando o feed de paginação HTML.
     """
-    print("Iniciando a extração de dados do G1...")
-
-    # --- Configuração do Selenium ---
-    chrome_options = Options()
-    # 'headless' faz o navegador rodar em segundo plano, sem abrir uma janela visual.
-    # Essencial para rodar em servidores (e no nosso container).
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox") # Necessário para rodar como root no Docker
-    chrome_options.add_argument("--disable-dev-shm-usage") # Necessário para rodar no Docker
-    chrome_options.add_argument("--window-size=1920,1080")
-
-    # Instala e gerencia o driver do Chrome automaticamente
-    service = ChromeService()
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+    print(f"Iniciando a extração de dados do G1 para {num_pages} página(s)...")
     
-    try:
-        url = "https://g1.globo.com/tecnologia/"
-        print(f"Acessando a URL: {url}")
-        driver.get(url)
-
-        # --- Rolagem da Página ---
-        print("Aguardando carregamento inicial e rolando a página...")
-        # Damos um tempo inicial para a página carregar
-        time.sleep(5) 
-        
-        # Rola a página para baixo 3 vezes para carregar mais notícias
-        for i in range(3):
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            print(f"Rolagem {i+1}/3...")
-            time.sleep(3) # Espera 3 segundos para o conteúdo carregar
-
-        # Pega o HTML da página DEPOIS de toda a rolagem
-        html_content = driver.page_source
-        print("HTML da página completa capturado.")
-
-    finally:
-        # Garante que o navegador seja fechado mesmo se ocorrer um erro
-        driver.quit()
-        print("Navegador Selenium fechado.")
-
-    # --- Análise com BeautifulSoup ---
-    soup = BeautifulSoup(html_content, "html.parser")
-    lista_noticias = soup.find_all("div", class_="feed-post-body")
-    
-    if not lista_noticias:
-        print("Nenhum container de notícia ('feed-post-body') foi encontrado após a rolagem.")
-        return
-
-    print(f"Encontradas {len(lista_noticias)} notícias no G1 após a rolagem.")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
     
     noticias_extraidas = []
-    for noticia_html in lista_noticias:
-        titulo_element = noticia_html.find("a", class_="feed-post-link")
-        
-        if titulo_element and titulo_element.has_attr('href'):
-            titulo = titulo_element.get_text(strip=True)
-            link = titulo_element.get("href")
-            
-            if titulo and link:
-                noticias_extraidas.append({
-                    "titulo": titulo,
-                    "link": link,
-                    "fonte": "G1 Tecnologia",
-                    "data_extracao": datetime.now().isoformat()
-                })
 
-    # --- Salvando o arquivo ---
+    # Loop para navegar pelas páginas do feed
+    for page_num in range(1, num_pages + 1):
+        url_pagina = f"https://g1.globo.com/tecnologia/index/feed/pagina-{page_num}.ghtml"
+        print(f"Extraindo dados da página {page_num}: {url_pagina}")
+
+        try:
+            response = requests.get(url_pagina, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, "html.parser")
+            lista_noticias_html = soup.find_all("div", class_="feed-post-body")
+            
+            if not lista_noticias_html:
+                print(f"Nenhuma notícia encontrada na página {page_num}. A paginação pode ter terminado.")
+                break # Se não há mais notícias, paramos o loop
+
+            for noticia_html in lista_noticias_html:
+                titulo_element = noticia_html.find("a", class_="feed-post-link")
+                if titulo_element and titulo_element.has_attr('href'):
+                    noticias_extraidas.append({
+                        "titulo": titulo_element.get_text(strip=True),
+                        "link": titulo_element.get("href"),
+                        "fonte": "G1 Tecnologia",
+                        "data_publicacao": None, # A data não está disponível neste feed
+                        "data_extracao": datetime.now().isoformat()
+                    })
+            
+            # Pausa entre as requisições
+            if page_num < num_pages:
+                print(f"Aguardando 1 segundo...")
+                time.sleep(1)
+
+        except requests.RequestException as e:
+            print(f"Erro ao processar a página {page_num} do G1: {e}. Parando a paginação.")
+            break
+
+    # --- Salvando o arquivo com todas as notícias coletadas ---
     if noticias_extraidas:
         caminho_base = '/opt/airflow/scripts/temp_data'
         os.makedirs(caminho_base, exist_ok=True)
         caminho_arquivo = os.path.join(caminho_base, "g1_noticias.json")
-        
         with open(caminho_arquivo, "w", encoding="utf-8") as f:
             json.dump(noticias_extraidas, f, ensure_ascii=False, indent=4)
-        
         print(f"Dados salvos em {caminho_arquivo}")
         print(f"Total de notícias extraídas do G1: {len(noticias_extraidas)}")
     else:
         print("Nenhuma notícia foi efetivamente extraída do G1.")
 
-if __name__ == "__main__":
-    extract_g1_data()
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Script de extração de notícias do G1 com paginação.")
+    parser.add_argument("--num-pages", type=int, default=1, help="Número de páginas para extrair. Padrão: 1.")
+    args = parser.parse_args()
+    
+    extract_g1_data(num_pages=args.num_pages)
