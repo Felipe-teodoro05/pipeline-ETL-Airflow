@@ -1,18 +1,17 @@
 # Importação das bibliotecas necessárias
 import requests
 from bs4 import BeautifulSoup
-import json
-import os
 import time
 from datetime import datetime
 import argparse
 
-# --- MUDANÇA 1: Nome da função corrigido ---
-def extract_techcrunch_data(num_pages: int):
+
+def extract_techcrunch_data(num_pages):
     """
     Extrai as notícias da seção de Startups do TechCrunch, 
     navegando por um número customizado de páginas.
     """
+    num_pages = int(num_pages)
     print(f"Iniciando a extração de dados do TechCrunch para {num_pages} página(s)...")
 
     url_base = "https://techcrunch.com/category/startups/"
@@ -71,19 +70,9 @@ def extract_techcrunch_data(num_pages: int):
             print("Aguardando 1 segundo antes da próxima página...")
             time.sleep(1)
 
-    # --- Salvamento dos dados ---
-    if noticias_extraidas:
-        caminho_base = '/opt/airflow/scripts/temp_data'
-        os.makedirs(caminho_base, exist_ok=True)
-        caminho_arquivo = os.path.join(caminho_base, "techcrunch_noticias.json")
-        
-        with open(caminho_arquivo, "w", encoding="utf-8") as f:
-            json.dump(noticias_extraidas, f, ensure_ascii=False, indent=4)
-        
-        print(f"Dados salvos em {caminho_arquivo}")
-        print(f"Total de notícias extraídas do TechCrunch: {len(noticias_extraidas)}") 
-    else:
-        print("Nenhuma notícia foi efetivamente extraída do TechCrunch.")
+    # --- Retorna os dados ---
+    print(f"Total de notícias coletadas do TechCrunch: {len(noticias_extraidas)}")
+    return noticias_extraidas
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Script de extração de notícias do TechCrunch.")

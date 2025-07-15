@@ -1,17 +1,16 @@
 import requests
 from bs4 import BeautifulSoup
-import json
-import os
 import time
 from datetime import datetime
 import argparse
 import pandas as pd
 
-def extract_theverge_data(num_pages: int):
+def extract_theverge_data(num_pages):
     """
     Extrai notícias da seção de tecnologia do The Verge, com paginação,
     usando o seletor de container correto e removendo duplicatas no final.
     """
+    num_pages = int(num_pages)
     print(f"Iniciando a extração de dados do The Verge para {num_pages} página(s)...")
     
     url_base = "https://www.theverge.com"
@@ -69,25 +68,8 @@ def extract_theverge_data(num_pages: int):
             print("Aguardando 1 segundo...")
             time.sleep(1)
 
-    if noticias_extraidas:
-        print(f"\nTotal de notícias coletadas (bruto): {len(noticias_extraidas)}")
-        
-        df = pd.DataFrame(noticias_extraidas)
-        df_sem_duplicatas = df.drop_duplicates(subset=['link'], keep='first')
-        noticias_finais = df_sem_duplicatas.to_dict('records')
-        
-        print(f"Total de notícias únicas: {len(noticias_finais)}")
-        
-        caminho_base = '/opt/airflow/scripts/temp_data'
-        os.makedirs(caminho_base, exist_ok=True)
-        caminho_arquivo = os.path.join(caminho_base, "theverge_noticias.json")
-        
-        with open(caminho_arquivo, "w", encoding="utf-8") as f:
-            json.dump(noticias_finais, f, ensure_ascii=False, indent=4)
-        
-        print(f"Dados salvos em {caminho_arquivo}")
-    else:
-        print("Nenhuma notícia foi efetivamente extraída do The Verge.")
+    print(f"The Verge: Extração concluída. {len(noticias_extraidas)} notícias encontradas.")
+    return noticias_extraidas
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Script de extração de notícias do The Verge com paginação.")

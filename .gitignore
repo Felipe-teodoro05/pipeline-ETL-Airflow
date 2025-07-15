@@ -3,10 +3,6 @@ venv/
 .venv/
 __pycache__/
 
-# Arquivos temporários gerados pelos scripts
-# Não queremos versionar os dados, apenas o código que os gera
-scripts/temp_data/
-
 # Logs do Airflow
 logs/
 

@@ -1,4 +1,4 @@
-Iniciando o dia:
+-- Iniciando o dia:
 
 Abra o terminal na pasta do projeto.
 
@@ -6,11 +6,15 @@ Rode: docker compose up -d
 
 Acesse http://localhost:8080.
 
-Finalizando o dia:
+-- Finalizando o dia:
 
 Abra o terminal na pasta do projeto.
 
 Rode: docker compose down
 
-Instalar bibliotecas necessárias:
+-- Instalar bibliotecas necessárias:
 docker compose exec --user airflow airflow-webserver python -m pip install requests beautifulsoup4
+
+-- Acessar banco de dados
+docker exec -it postgres_db_noticias psql -U airflow
+\quit

@@ -1,15 +1,14 @@
 import requests
 from bs4 import BeautifulSoup
-import json
-import os
 import time
 from datetime import datetime
 import argparse
 
-def extract_g1_data(num_pages: int):
+def extract_g1_data(num_pages):
     """
     Extrai notícias de tecnologia do G1 usando o feed de paginação HTML.
     """
+    num_pages = int(num_pages)
     print(f"Iniciando a extração de dados do G1 para {num_pages} página(s)...")
     
     headers = {
@@ -44,31 +43,30 @@ def extract_g1_data(num_pages: int):
                         "data_publicacao": None, # A data não está disponível neste feed
                         "data_extracao": datetime.now().isoformat()
                     })
-            
-            # Pausa entre as requisições
-            if page_num < num_pages:
-                print(f"Aguardando 1 segundo...")
-                time.sleep(1)
 
         except requests.RequestException as e:
             print(f"Erro ao processar a página {page_num} do G1: {e}. Parando a paginação.")
             break
 
-    # --- Salvando o arquivo com todas as notícias coletadas ---
-    if noticias_extraidas:
-        caminho_base = '/opt/airflow/scripts/temp_data'
-        os.makedirs(caminho_base, exist_ok=True)
-        caminho_arquivo = os.path.join(caminho_base, "g1_noticias.json")
-        with open(caminho_arquivo, "w", encoding="utf-8") as f:
-            json.dump(noticias_extraidas, f, ensure_ascii=False, indent=4)
-        print(f"Dados salvos em {caminho_arquivo}")
-        print(f"Total de notícias extraídas do G1: {len(noticias_extraidas)}")
-    else:
-        print("Nenhuma notícia foi efetivamente extraída do G1.")
+        # Pausa entre as requisições
+        if page_num < num_pages:
+            print(f"Aguardando 1 segundo...")
+            time.sleep(1)
 
-if __name__ == '__main__':
+    # --- Retornando todas as notícias coletadas ---
+    print(f"G1: Extração concluída. {len(noticias_extraidas)} notícias encontradas.")
+    return noticias_extraidas
+
+if __name__ == '__main__':  
     parser = argparse.ArgumentParser(description="Script de extração de notícias do G1 com paginação.")
-    parser.add_argument("--num-pages", type=int, default=1, help="Número de páginas para extrair. Padrão: 1.")
+    parser.add_argument(
+        "--num-pages", 
+        type=int, 
+        default=1, 
+        help="Número de páginas para extrair. Padrão: 1."
+    )
+    
     args = parser.parse_args()
     
+    # Chama a função principal com o argumento recebido
     extract_g1_data(num_pages=args.num_pages)

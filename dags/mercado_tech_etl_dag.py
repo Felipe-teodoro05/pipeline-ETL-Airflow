@@ -2,10 +2,15 @@ from __future__ import annotations # Apenas como garantia de compatibilidade fut
 
 import pendulum # Para data e hora, muito mais intuitivo que datetime
 from airflow.models import DAG
-from airflow.operators.bash import BashOperator # Para executar scripts Python
 from airflow.operators.empty import EmptyOperator # Para marcar início e fim do DAG
 from airflow.providers.postgres.operators.postgres import PostgresOperator
+from airflow.operators.python import PythonOperator # <-- Novo operador
 from airflow.models.param import Param
+from scripts.extract_g1 import extract_g1_data
+from scripts.extract_verge import extract_theverge_data
+from scripts.extract_techcrunch import extract_techcrunch_data
+from scripts.transform import transformar_dados
+from scripts.load import carregar_dados_no_postgres
 
 # Definindo fuso horário
 local_tz = pendulum.timezone("America/Sao_Paulo")
@@ -23,6 +28,12 @@ with DAG(
             minimum = 1,
             title = "Número de páginas a serem raspadas",
             description = "Quantas páginas de cada fonte devem ser extraídas. Padrão é 1 para execuções agendadas (incrementais)"
+        ),
+        "truncate_table": Param(
+            False,
+            type = "boolean",
+            title = "Limpar tabela antes de carregar?",
+            description = "Se True, a tabela será limpa antes de inserir novos dados. Use apenas para cargas históricas ou quando necessário."
         )
     },
     doc_md="""
@@ -55,38 +66,66 @@ with DAG(
         """
     )
 
+    truncate_table = PostgresOperator(
+        task_id="truncate_table",
+        postgres_conn_id="postgres_noticias",
+        sql="""
+        {% if params.truncate_table %}
+            TRUNCATE TABLE noticias_mercado;
+        {% else %}
+            SELECT 1;
+        {% endif %}
+        """,
+    )
+
     # --- Extração dos dados ---
-    extract_g1 = BashOperator(
-        task_id = "extrair_noticias_g1",
-        bash_command = "python /opt/airflow/scripts/extract_g1.py --num-pages {{ params.num_pages_scrape }}",
+    extract_g1 = PythonOperator(
+        task_id="extrair_noticias_g1",
+        python_callable=extract_g1_data,
+        op_kwargs={"num_pages": "{{ params.num_pages_scrape }}"}
     )
 
-    extract_theverge = BashOperator(
-        task_id = "extrair_noticias_theverge",
-        bash_command = "python /opt/airflow/scripts/extract_verge.py --num-pages {{ params.num_pages_scrape }}",
+    extract_theverge = PythonOperator(
+        task_id="extrair_noticias_theverge",
+        python_callable=extract_theverge_data,
+        op_kwargs={"num_pages": "{{ params.num_pages_scrape }}"}
     )
 
-    extract_techcrunch = BashOperator(
-        task_id = "extrair_noticias_techcrunch",
-        bash_command = "python /opt/airflow/scripts/extract_techcrunch.py --num-pages {{ params.num_pages_scrape }}",
+    extract_techcrunch = PythonOperator(
+        task_id="extrair_noticias_techcrunch",
+        python_callable=extract_techcrunch_data,
+        op_kwargs={"num_pages": "{{ params.num_pages_scrape }}"}
     )
 
     # --- Transformação dos dados ---
     # Executado após a extração de todas as fontes
-    transform = BashOperator(
-        task_id = "transformar_noticias",
-        bash_command = "python /opt/airflow/scripts/transform.py",
+    transform_data = PythonOperator(
+        task_id="transformar_dados",
+        python_callable=transformar_dados
     )
 
     # --- Carregamento dos dados ---
     # Executado após a transformação dos dados
-    load = BashOperator(
-        task_id = "carregar_noticias_postgres",
-        bash_command = "python /opt/airflow/scripts/load.py",
+    load_data = PythonOperator(
+        task_id="carregar_dados_postgres",
+        python_callable=carregar_dados_no_postgres
     )
 
     # Marcar o fim do DAG
     end = EmptyOperator(task_id = "end")
 
     # Definindo a ordem de execução das tarefas
-    start >> create_table >> [extract_g1, extract_theverge, extract_techcrunch] >> transform >> load >> end
+    # A tarefa de setup principal 
+    start >> create_table
+
+    # A limpeza da tabela depende da sua existência
+    create_table >> truncate_table
+
+    # As extrações só começam depois da limpeza da tabela
+    truncate_table >> [extract_g1, extract_theverge, extract_techcrunch]
+
+    # A transformação espera por TODAS as extrações
+    [extract_g1, extract_theverge, extract_techcrunch] >> transform_data
+
+    # A carga espera pela transformação e, ao final, a tarefa end é executada
+    transform_data >> load_data >> end
