@@ -1,16 +1,17 @@
-# Pipeline de ETL de Notícias de Tecnologia com Airflow e Docker
+# TechPulse: Automated Market Intelligence Pipeline
 
-Este projeto implementa um pipeline de ETL (Extração, Transformação e Carga) automatizado e idempotente para coletar notícias de tecnologia de múltiplas fontes, processá-las e armazená-las em um banco de dados PostgreSQL. O ambiente é 100% containerizado com Docker e orquestrado pelo Apache Airflow.
+![Status](https://img.shields.io/badge/Status-Production%20Ready-success) ![Airflow](https://img.shields.io/badge/Orchestration-Apache%20Airflow-red) ![Docker](https://img.shields.io/badge/Containerization-Docker-blue) ![Python](https://img.shields.io/badge/Language-Python%203.9-yellow)
 
-## O Problema de Negócio (O "Porquê")
+## Business Problem (O Desafio)
+No mercado de tecnologia, a latência da informação é um risco competitivo. Processos manuais de monitoramento de tendências são lentos, não escaláveis e propensos a viés humano.
 
-Uma startup de tecnologia precisa se manter atualizada sobre o cenário competitivo e as últimas tendências. A equipe de estratégia depende de notícias de portais de tecnologia para tomar decisões, mas o processo de coletar, ler e organizar essas informações manualmente é lento, propenso a erros e consome horas preciosas.
+**O Objetivo:** Engenhar uma solução de *Market Intelligence* autônoma que monitore, extraia e estruture dados de múltiplos players globais (TechCrunch, The Verge, G1) em tempo real. O sistema deve garantir **alta disponibilidade**, **idempotência** e entregar dados enriquecidos com NLP (Processamento de Linguagem Natural) para o time de estratégia.
 
-A solução é um pipeline de dados automatizado que centraliza as notícias mais relevantes de fontes-chave em um banco de dados estruturado, pronto para análise e geração de insights.
+---
 
-## Arquitetura da Solução
+## Architecture & Engineering
 
-O fluxo de dados foi projetado para ser robusto e resiliente. A comunicação entre as tarefas do Airflow é feita via **XComs**, o sistema de mensagens interno do Airflow, eliminando a dependência de arquivos em disco e prevenindo problemas de estado entre as execuções.
+A arquitetura foi desenhada seguindo os princípios de **Microserviços** e **Isolamento de Recursos**. O ambiente é 100% containerizado, garantindo reprodutibilidade imediata em qualquer Cloud (AWS/GCP) ou ambiente local.
 
 ```mermaid
 graph TD
@@ -49,19 +50,25 @@ graph TD
         G -- Consulta --> F
     end
 ```
+### Decisões Técnicas de Engenharia
 
-## Stack de Tecnologias
+- **Orquestração com Airflow:** escolhido para gerenciar dependências complexas e permitir *backfilling* (recuperação de dados históricos) e *retries* automáticos em caso de falha dos sites fonte.
+- **XComs vs. S3:** para este escopo (dados textuais leves), utilizou-se XComs para passagem de mensagens entre tarefas visando simplicidade da infraestrutura. Nota: para escala de Big Data, o design é adaptável para *staging* em S3/MinIO.
+- **Estratégia de carga (Upsert):** implementação de lógica para evitar duplicidade de notícias no banco de dados, garantindo a integridade da *Single Source of Truth*.
 
-* **Orquestração de Pipeline:** Apache Airflow
-* **Containerização:** Docker & Docker Compose
-* **Banco de Dados:** PostgreSQL
-* **Linguagem Principal:** Python 3.8
-* **Extração de Dados (Web Scraping):**
-    * **BeautifulSoup4 & Requests:** Para parsing de HTML e requisições HTTP.
-* **Transformação e Análise:**
-    * **Pandas:** Para manipulação e limpeza de dados em memória.
-    * **spaCy:** Para Processamento de Linguagem Natural (NLP), especificamente para Reconhecimento de Entidades Nomeadas (extração de nomes de empresas dos títulos).
-* **Comunicação entre Tarefas:** Airflow XComs
+
+## Tech Stack
+
+| Componente | Tecnologia | Função |
+|---|---|---|
+| Orchestrator | Apache Airflow 2.x | Gerenciamento de DAGs e monitoramento |
+| Container | Docker & Compose | Isolamento de ambiente e deploy simplificado |
+| Database | PostgreSQL | Data warehouse transacional |
+| Ingestion | Python (Requests/BS4) | Extração de dados de fontes dinâmicas |
+| Analytics/NLP | SpaCy & Pandas | NER (Named Entity Recognition) para identificar empresas citadas |
+
+## DAG
+![Diagrama do Airflow](Workflow.png)
 
 ## Estrutura do Projeto
 
@@ -81,7 +88,7 @@ pipeline_noticias_tech/
 └── docker-compose.yml # Plano mestre para orquestrar todos os nossos serviços.
 ```
 
-## Como Executar o Ambiente Localmente
+## How to Run (Deploy Local)
 
 Siga os passos abaixo para construir e iniciar o ambiente completo na sua máquina.
 
@@ -121,7 +128,7 @@ Siga os passos abaixo para construir e iniciar o ambiente completo na sua máqui
 
 3.  **Execute o Pipeline:**
     * Encontre a DAG `mercado_tech_etl_pipeline`, ative-a no botão de toggle.
-    * Para uma **carga histórica inicial** (ex: 10 páginas), clique no botão Play (▶️), selecione **"Trigger DAG w/ config"** e ajuste os parâmetros `num_pages_to_scrape` e `truncate_table`.
+    * Para uma **carga histórica inicial** (ex: 10 páginas), clique no botão Play, selecione **"Trigger DAG w/ config"** e ajuste os parâmetros `num_pages_to_scrape` e `truncate_table`.
     * Para simular uma **execução diária normal**, apenas clique em "Trigger DAG", e ele usará os valores padrão (1 página, sem truncar a tabela).
 
 4.  **Acesse o Banco de Dados:**
